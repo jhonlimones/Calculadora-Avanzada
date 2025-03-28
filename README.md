@@ -2,6 +2,8 @@
 
 Un sistema avanzado de calculadora con autenticación de usuarios, operaciones matemáticas, registro de historial, exportación de datos y capacidades de consulta mediante un chatbot SQL.
 
+![Calculadora Avanzada](./public/calculadora.jpg)
+
 ## Características Principales
 
 - **Sistema de autenticación**: Usuarios normales y superusuarios
@@ -48,54 +50,110 @@ calculadora/
 
 ## Diagrama de Flujo
 
+El siguiente diagrama muestra el flujo de trabajo de la aplicación:
+
 ```mermaid
-graph TB
-    Start[Inicio Aplicación] --> Auth{Autenticación}
-    Auth -->|Éxito| Menu[Menú Principal]
+flowchart TD
+    %% Estilo para los nodos
+    classDef default fill:#f9f9f9,stroke:#999,stroke-width:1px,color:#333
+    classDef process fill:#e1f5fe,stroke:#29b6f6,stroke-width:2px,color:#0277bd
+    classDef decision fill:#fff8e1,stroke:#ffb300,stroke-width:2px,color:#ff8f00
+    classDef start fill:#e8f5e9,stroke:#66bb6a,stroke-width:2px,color:#2e7d32
+    classDef end fill:#ffebee,stroke:#ef5350,stroke-width:2px,color:#c62828
+    classDef superuser fill:#f3e5f5,stroke:#ab47bc,stroke-width:2px,color:#6a1b9a
+
+    %% Nodos principales
+    Start([Inicio Aplicación]):::start --> Auth{Autenticación}:::decision
+    Auth -->|Éxito| Menu[Menú Principal]:::process
     Auth -->|Fallido| Auth
     
-    Menu --> Op1[Nueva Operación]
-    Menu --> Op2[Consultas]
-    Menu --> Op3[Ver Historial]
-    Menu --> Op4[Exportar]
+    %% Opciones de menú - Usuario normal
+    subgraph UserOptions[Opciones para todos los usuarios]
+        direction TB
+        Op1[Nueva Operación]:::process
+        Op2[Consultas]:::process
+        Op3[Ver Historial]:::process
+        Op4[Exportar]:::process
+    end
     
-    Menu -->|Solo Superusuario| Op5[Crear Usuario]
-    Menu -->|Solo Superusuario| Op6[Chatbot SQL]
-    Menu --> Exit[Salir]
+    %% Opciones de menú - Superusuario
+    subgraph AdminOptions[Opciones exclusivas para superusuario]
+        direction TB
+        Op5[Crear Usuario]:::superuser
+        Op6[Chatbot SQL]:::superuser
+    end
     
-    Op1 --> |Realizar Cálculo| SaveOp[Guardar en BD]
-    SaveOp --> SaveHist[Registrar en Historial]
+    %% Conexiones al menú principal
+    Menu --> UserOptions
+    Menu --> AdminOptions
+    Menu --> Exit([Salir]):::end
+    
+    %% Flujo de operación matemática
+    Op1 --> OperFlow[Realizar cálculo]:::process
+    OperFlow --> SaveOp[Guardar en BD]:::process
+    SaveOp --> SaveHist[Registrar en Historial]:::process
     SaveHist --> Menu
     
-    Op2 --> |Consultas Predefinidas| ShowResults[Mostrar Resultados]
+    %% Flujo de consultas
+    Op2 --> QueryType{Tipo consulta}:::decision
+    QueryType -->|Usuario| UserQueries[Mis operaciones]:::process
+    QueryType -->|Superusuario| AllQueries[Todas las operaciones]:::superuser
+    UserQueries & AllQueries --> ShowResults[Mostrar resultados]:::process
     ShowResults --> Menu
     
-    Op3 --> ShowHist[Mostrar Historial]
+    %% Flujo de historial
+    Op3 --> HistType{Tipo usuario}:::decision
+    HistType -->|Normal| UserHist[Mi historial]:::process
+    HistType -->|Superusuario| AllHist[Historial completo]:::superuser
+    UserHist & AllHist --> ShowHist[Mostrar historial]:::process
     ShowHist --> Menu
     
-    Op4 --> ExportType{Tipo Exportación}
-    ExportType -->|CSV| ExportCSV[Exportar CSV]
-    ExportType -->|Excel| ExportExcel[Exportar Excel]
-    ExportCSV --> Menu
-    ExportExcel --> Menu
+    %% Flujo de exportación
+    Op4 --> ExportType{Formato}:::decision
+    ExportType -->|CSV| ExportCSV[Exportar CSV]:::process
+    ExportType -->|Excel| ExportExcel[Exportar Excel]:::process
+    ExportCSV & ExportExcel --> Menu
     
-    Op5 --> CreateUser[Crear Usuario]
-    CreateUser --> Menu
+    %% Flujo de creación de usuario
+    Op5 --> VerifyAuth{Verificar contraseña}:::decision
+    VerifyAuth -->|Correcta| UserType{Tipo usuario}:::decision
+    UserType -->|Normal| CreateUser[Crear usuario normal]:::process
+    UserType -->|Super| CreateSuper[Crear superusuario]:::superuser
+    CreateUser & CreateSuper --> Menu
+    VerifyAuth -->|Incorrecta| Menu
     
-    Op6 --> Chatbot[Chatbot SQL]
-    Chatbot --> |Consulta Natural| Process[Procesar Consulta]
-    Process --> |Generar SQL| Execute[Ejecutar SQL]
-    Execute --> |Mostrar Resultados| Chatbot
-    Chatbot --> Menu
+    %% Flujo de chatbot SQL
+    Op6 --> VerifyAuthSQL{Verificar contraseña}:::decision
+    VerifyAuthSQL -->|Correcta| Chatbot[Chatbot SQL]:::superuser
+    VerifyAuthSQL -->|Incorrecta| Menu
+    
+    Chatbot --> NLQuery[Consulta en lenguaje natural]:::process
+    NLQuery --> Process[Procesar consulta]:::process
+    Process --> GenSQL[Generar SQL]:::process
+    GenSQL --> Execute[Ejecutar consulta]:::process
+    Execute --> Format[Formatear resultados]:::process
+    Format --> Chatbot
+    Chatbot -->|Salir| Menu
 ```
 
-## Arquitectura MVC del Chatbot SQL
+**Nota**: El diagrama se visualizará correctamente cuando subas el README.md a GitHub o GitLab.
 
-El chatbot SQL implementa una arquitectura Modelo-Vista-Controlador:
+### Descripción del flujo
+
+1. **Inicio y Autenticación**: La aplicación comienza con un sistema de autenticación donde el usuario debe registrarse o iniciar sesión.
+2. **Menú Principal**: Tras autenticarse, se accede al menú principal con múltiples opciones.
+3. **Operaciones**: El usuario puede realizar operaciones matemáticas que se guardan en la base de datos y se registran en el historial.
+4. **Consultas y Exportación**: Se pueden consultar operaciones anteriores y exportar resultados.
+5. **Funciones de Superusuario**: Los superusuarios tienen acceso a funcionalidades adicionales como la creación de usuarios y el chatbot SQL.
+6. **Chatbot SQL**: Permite realizar consultas en lenguaje natural que se convierten en SQL y muestran resultados formateados.
+
+## Arquitectura MCP del Chatbot SQL
+
+El chatbot SQL implementa una arquitectura Modelo-Controlador-Presentador (MCP):
 
 - **Modelo**: Representado por las operaciones de base de datos en `db/models.py`
-- **Vista**: Implementada en la interfaz de línea de comandos en `cli_app.py`
-- **Controlador**: Lógica principal en `sql_chatbot.py` que conecta las consultas en lenguaje natural con las operaciones de base de datos
+- **Controlador**: Lógica principal en `sql_chatbot.py` que procesa las consultas en lenguaje natural
+- **Presentador**: Componente encargado de formatear y presentar los resultados al usuario a través de la interfaz CLI
 
 ## Requisitos Previos
 
