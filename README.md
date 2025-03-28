@@ -2,8 +2,6 @@
 
 Un sistema avanzado de calculadora con autenticación de usuarios, operaciones matemáticas, registro de historial, exportación de datos y capacidades de consulta mediante un chatbot SQL.
 
-![Calculadora Avanzada](https://raw.githubusercontent.com/username/calculadora-avanzada/main/docs/logo.png)
-
 ## Características Principales
 
 - **Sistema de autenticación**: Usuarios normales y superusuarios
