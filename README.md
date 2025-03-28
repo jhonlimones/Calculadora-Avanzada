@@ -54,84 +54,77 @@ El siguiente diagrama muestra el flujo de trabajo de la aplicación:
 
 ```mermaid
 flowchart TD
-    %% Estilo para los nodos
-    classDef default fill:#f9f9f9,stroke:#999,stroke-width:1px,color:#333
-    classDef process fill:#e1f5fe,stroke:#29b6f6,stroke-width:2px,color:#0277bd
-    classDef decision fill:#fff8e1,stroke:#ffb300,stroke-width:2px,color:#ff8f00
-    classDef start fill:#e8f5e9,stroke:#66bb6a,stroke-width:2px,color:#2e7d32
-    classDef end fill:#ffebee,stroke:#ef5350,stroke-width:2px,color:#c62828
-    classDef superuser fill:#f3e5f5,stroke:#ab47bc,stroke-width:2px,color:#6a1b9a
-
-    %% Nodos principales
-    Start([Inicio Aplicación]):::start --> Auth{Autenticación}:::decision
-    Auth -->|Éxito| Menu[Menú Principal]:::process
+    Start([Inicio Aplicación]) --> Auth{Autenticación}
+    Auth -->|Éxito| Menu[Menú Principal]
     Auth -->|Fallido| Auth
     
     %% Opciones de menú - Usuario normal
     subgraph UserOptions[Opciones para todos los usuarios]
-        direction TB
-        Op1[Nueva Operación]:::process
-        Op2[Consultas]:::process
-        Op3[Ver Historial]:::process
-        Op4[Exportar]:::process
+        Op1[Nueva Operación]
+        Op2[Consultas]
+        Op3[Ver Historial]
+        Op4[Exportar]
     end
     
     %% Opciones de menú - Superusuario
     subgraph AdminOptions[Opciones exclusivas para superusuario]
-        direction TB
-        Op5[Crear Usuario]:::superuser
-        Op6[Chatbot SQL]:::superuser
+        Op5[Crear Usuario]
+        Op6[Chatbot SQL]
     end
     
     %% Conexiones al menú principal
     Menu --> UserOptions
     Menu --> AdminOptions
-    Menu --> Exit([Salir]):::end
+    Menu --> Exit([Salir])
     
     %% Flujo de operación matemática
-    Op1 --> OperFlow[Realizar cálculo]:::process
-    OperFlow --> SaveOp[Guardar en BD]:::process
-    SaveOp --> SaveHist[Registrar en Historial]:::process
+    Op1 --> OperFlow[Realizar cálculo]
+    OperFlow --> SaveOp[Guardar en BD]
+    SaveOp --> SaveHist[Registrar en Historial]
     SaveHist --> Menu
     
     %% Flujo de consultas
-    Op2 --> QueryType{Tipo consulta}:::decision
-    QueryType -->|Usuario| UserQueries[Mis operaciones]:::process
-    QueryType -->|Superusuario| AllQueries[Todas las operaciones]:::superuser
-    UserQueries & AllQueries --> ShowResults[Mostrar resultados]:::process
+    Op2 --> QueryType{Tipo consulta}
+    QueryType -->|Usuario| UserQueries[Mis operaciones]
+    QueryType -->|Superusuario| AllQueries[Todas las operaciones]
+    UserQueries --> ShowResults[Mostrar resultados]
+    AllQueries --> ShowResults
     ShowResults --> Menu
     
     %% Flujo de historial
-    Op3 --> HistType{Tipo usuario}:::decision
-    HistType -->|Normal| UserHist[Mi historial]:::process
-    HistType -->|Superusuario| AllHist[Historial completo]:::superuser
-    UserHist & AllHist --> ShowHist[Mostrar historial]:::process
+    Op3 --> HistType{Tipo usuario}
+    HistType -->|Normal| UserHist[Mi historial]
+    HistType -->|Superusuario| AllHist[Historial completo]
+    UserHist --> ShowHist[Mostrar historial]
+    AllHist --> ShowHist
     ShowHist --> Menu
     
     %% Flujo de exportación
-    Op4 --> ExportType{Formato}:::decision
-    ExportType -->|CSV| ExportCSV[Exportar CSV]:::process
-    ExportType -->|Excel| ExportExcel[Exportar Excel]:::process
-    ExportCSV & ExportExcel --> Menu
+    Op4 --> ExportType{Formato}
+    ExportType -->|CSV| ExportCSV[Exportar CSV]
+    ExportType -->|Excel| ExportExcel[Exportar Excel]
+    ExportCSV --> Menu
+    ExportExcel --> Menu
     
     %% Flujo de creación de usuario
-    Op5 --> VerifyAuth{Verificar contraseña}:::decision
-    VerifyAuth -->|Correcta| UserType{Tipo usuario}:::decision
-    UserType -->|Normal| CreateUser[Crear usuario normal]:::process
-    UserType -->|Super| CreateSuper[Crear superusuario]:::superuser
-    CreateUser & CreateSuper --> Menu
+    Op5 --> VerifyAuth{Verificar contraseña}
+    VerifyAuth -->|Correcta| UserType{Tipo usuario}
+    UserType -->|Normal| CreateUser[Crear usuario normal]
+    UserType -->|Super| CreateSuper[Crear superusuario]
+    CreateUser --> Menu
+    CreateSuper --> Menu
     VerifyAuth -->|Incorrecta| Menu
     
     %% Flujo de chatbot SQL
-    Op6 --> VerifyAuthSQL{Verificar contraseña}:::decision
-    VerifyAuthSQL -->|Correcta| Chatbot[Chatbot SQL]:::superuser
+    Op6 --> VerifyAuthSQL{Verificar contraseña}
+    VerifyAuthSQL -->|Correcta| Chatbot[Chatbot SQL]
     VerifyAuthSQL -->|Incorrecta| Menu
     
-    Chatbot --> NLQuery[Consulta en lenguaje natural]:::process
-    NLQuery --> Process[Procesar consulta]:::process
-    Process --> GenSQL[Generar SQL]:::process
-    GenSQL --> Execute[Ejecutar consulta]:::process
-    Execute --> Format[Formatear resultados]:::process
+    Chatbot --> NLQuery[Consulta en lenguaje natural]
+    NLQuery --> Process[Procesar consulta]
+    Process --> GenSQL[Generar SQL]
+    GenSQL --> Execute[Ejecutar consulta]
+    Execute --> Format[Formatear resultados]
     Format --> Chatbot
     Chatbot -->|Salir| Menu
 ```
