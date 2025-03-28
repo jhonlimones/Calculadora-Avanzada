@@ -1,0 +1,8 @@
+pandas
+psycopg2-binary
+openpyxl
+python-dotenv
+schedule
+openai
+tenacity
+requests

@@ -1,0 +1,11 @@
+# .gitignore
+
+# Ignorar el archivo .env para no subir credenciales a Git
+.env
+
+# Puedes incluir otras reglas de tu preferencia
+
+__pycache__/
+*.pyc
+.venv/
+venv/
