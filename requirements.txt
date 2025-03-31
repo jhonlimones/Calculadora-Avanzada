@@ -6,3 +6,4 @@ schedule
 openai
 tenacity
 requests
+tabulate

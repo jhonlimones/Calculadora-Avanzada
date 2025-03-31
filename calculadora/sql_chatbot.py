@@ -1,11 +1,24 @@
 # calculadora/sql_chatbot.py
 
+import decimal
 import json
 import re
 import hashlib
 import os
 import requests  # Asegúrate de importar requests para las llamadas API
 from datetime import datetime, timedelta
+
+# Clase personalizada para JSON que pueda manejar objetos Decimal
+class DecimalEncoder(json.JSONEncoder):
+    """Clase personalizada para codificar objetos Decimal a JSON."""
+    def default(self, obj):
+        if isinstance(obj, decimal.Decimal):
+            # Convertir Decimal a float para serialización
+            return float(obj)
+        # Manejar datetime si es necesario
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super(DecimalEncoder, self).default(obj)
 
 # Configuración global
 # API Key Groq
@@ -158,10 +171,14 @@ class SQLSecurityValidator:
         
         # 4. Verificar límite sensible (opcional, para evitar consultas muy grandes)
         if "LIMIT" not in sql_upper and "SELECT" in sql_upper:
-            # Añadir LIMIT automáticamente si no existe
-            return True, "OK", sql_query + " LIMIT 100"
-        
-        return True, "OK", sql_query
+        # Verificar si la consulta ya termina con punto y coma
+            if sql_query.strip().endswith(';'):
+                # Quitar el punto y coma y añadir LIMIT con punto y coma al final
+                return True, "OK", sql_query.rstrip(';') + " LIMIT 100;"
+            else:
+                # Añadir LIMIT con punto y coma
+                return True, "OK", sql_query + " LIMIT 100;"
+            
 
 class SQLChatbot:
     def __init__(self, db_connection, api_key=GROQ_API_KEY, user_tech_level="medio"):
@@ -343,6 +360,10 @@ class SQLChatbot:
         2. Puedes usar JOINS complejos, subconsultas, funciones de agregación y ventana
         3. Puedes usar GROUP BY, HAVING, ORDER BY, y otras cláusulas avanzadas
         4. Nunca uses DELETE, INSERT, UPDATE, DROP, ALTER u otras operaciones de modificación
+        5. Si la consulta busca las "últimas" o "recientes" operaciones, usa ORDER BY creado_en DESC
+        6. Si se pide un número específico de resultados, usa LIMIT correctamente
+        7. Nunca termines una consulta con LIMIT y punto y coma juntos como "LIMIT 5;"
+        8. Si se solicita exportar datos, crea una consulta que seleccione los datos relevantes
         """
         
         prompt = f"""
@@ -399,6 +420,11 @@ class SQLChatbot:
         
         try:
             cursor = self.db_connection.cursor()
+            
+            # Asegurarse de que estamos en un estado de transacción limpio
+            self.db_connection.rollback()
+            
+            # Ejecutar la consulta
             cursor.execute(sql_query)
             
             # Si no hay resultados, devolver mensaje apropiado
@@ -408,11 +434,16 @@ class SQLChatbot:
             columns = [desc[0] for desc in cursor.description]
             results = [dict(zip(columns, row)) for row in cursor.fetchall()]
             
+            # Hacer commit explícito para cerrar la transacción
+            self.db_connection.commit()
+            
             result = {"success": True, "data": results, "query": sql_query}
             # Guardar en caché para futuras consultas idénticas
             self.cache.set(cache_key, result)
             return result
         except Exception as e:
+            # Asegurarse de hacer rollback en caso de error
+            self.db_connection.rollback()
             return {"success": False, "error": str(e), "query": sql_query}
     
     def _format_response(self, results, original_query):
@@ -426,52 +457,34 @@ class SQLChatbot:
         Returns:
             Respuesta formateada en lenguaje natural
         """
-        # Ajustar contenido según nivel técnico
-        technical_detail = {
-            "basico": "Explica los resultados de forma simple, evitando términos técnicos. SIEMPRE responde en español.",
-            "medio": "Equilibra los detalles técnicos con explicaciones accesibles. SIEMPRE responde en español.",
-            "avanzado": "Incluye detalles técnicos relevantes y términos SQL específicos. SIEMPRE responde en español."
-        }
-        
-        system_message = f"""
-        Eres un asistente que explica resultados de consultas SQL en lenguaje natural.
-        {technical_detail.get(self.user_tech_level, "medio")}
-        IMPORTANTE: SIEMPRE responde en español, independientemente del idioma de la consulta.
-        """
-        
         if results["success"]:
-            # Si hay demasiados resultados, mostrar solo algunos
-            if len(results["data"]) > 5:
-                data_str = "\n".join([str(row) for row in results["data"][:5]])
-                data_str += f"\n... y {len(results['data']) - 5} resultados más"
-            else:
-                data_str = "\n".join([str(row) for row in results["data"]])
+            # Si es una consulta de conteo/agregación (1 fila, 1 columna)
+            if len(results["data"]) == 1 and len(results["data"][0]) == 1:
+                # Obtener el valor único
+                key = list(results["data"][0].keys())[0]
+                value = results["data"][0][key]
                 
-            prompt = f"""
-            Consulta original: "{original_query}"
-            
-            SQL ejecutado: {results["query"]}
-            
-            Resultados: 
-            {data_str}
-            
-            Explica estos resultados en lenguaje natural, destacando información 
-            relevante y patrones interesantes.
-            """
+                # Formatear el resultado de manera directa
+                response = f"Resultado: {value}\n\nConsulta SQL ejecutada:\n{results['query']}"
+                return response
+                
+            # Si hay datos en la respuesta
+            elif results["data"]:
+                if len(results["data"]) > 5:
+                    data_str = "\n".join([str(row) for row in results["data"][:5]])
+                    data_str += f"\n... y {len(results['data']) - 5} resultados más"
+                else:
+                    data_str = "\n".join([str(row) for row in results["data"]])
+                
+                # Respuesta más directa
+                response = f"Resultados encontrados: {len(results['data'])}\n\n{data_str}\n\nConsulta SQL ejecutada:\n{results['query']}"
+                return response
+            else:
+                return f"No se encontraron resultados para esta consulta.\n\nConsulta SQL ejecutada:\n{results['query']}"
         else:
-            prompt = f"""
-            Consulta original: "{original_query}"
-            
-            SQL que falló: {results["query"]}
-            
-            Error: {results["error"]}
-            
-            Explica este error en términos simples y sugiere cómo el usuario 
-            podría reformular su consulta.
-            """
-            
-        return self._call_llm(self._add_spanish_instruction(prompt), system_message, temperature=0.7)
-    
+            # En caso de error
+            return f"Error en la consulta: {results['error']}\n\nConsulta SQL ejecutada:\n{results['query']}"
+        
     def process_query(self, user_input):
         """
         Procesa una consulta en lenguaje natural.
@@ -482,27 +495,35 @@ class SQLChatbot:
         Returns:
             Respuesta en lenguaje natural
         """
-        # Paso 1: Análisis de la consulta
-        intent = self._analyze_intent(user_input)
-        
-        # Paso 2: Generación de SQL
-        sql_query = self._generate_sql(user_input, intent)
-        
-        # Paso 3: Ejecución
-        results = self._execute_query(sql_query)
-        
-        # Paso 4: Presentación de resultados
-        response = self._format_response(results, user_input)
-        
-        # Guardar en historial
-        self.chat_history.append({
-            "query": user_input, 
-            "sql": sql_query,
-            "response": response,
-            "timestamp": datetime.now().isoformat()
-        })
-        
-        return response
+        try:
+            # Paso 1: Análisis de la consulta
+            intent = self._analyze_intent(user_input)
+            
+            # Paso 2: Generación de SQL
+            sql_query = self.get_sql_for_query(user_input)  # Usar el método mejorado
+            
+            # Paso 3: Ejecución
+            results = self._execute_query(sql_query)
+            
+            # Paso 4: Presentación de resultados
+            response = self._format_response(results, user_input)
+            
+            # Guardar en historial
+            self.chat_history.append({
+                "query": user_input, 
+                "sql": sql_query,
+                "response": response,
+                "timestamp": datetime.now().isoformat()
+            })
+            
+            return response
+        except Exception as e:
+            # Manejo de errores mejorado
+            error_message = f"Error al procesar la consulta: {str(e)}"
+            print(error_message)
+            # Consulta de respaldo en caso de error
+            fallback_response = "Lo siento, no pude procesar tu consulta. Por favor, intenta reformularla."
+            return fallback_response
     
     def get_feedback(self, is_correct, correction=None):
         """
@@ -580,7 +601,28 @@ class SQLChatbot:
         Returns:
             String con la consulta SQL generada
         """
-        intent = self._analyze_intent(user_input)
-        sql = self._generate_sql(user_input, intent)
-        return sql
-    
+        try:
+            intent = self._analyze_intent(user_input)
+            sql = self._generate_sql(user_input, intent)
+            
+            # Verificar si la consulta está relacionada con mostrar las últimas operaciones
+            if "últimas" in user_input.lower() and "operaciones" in user_input.lower():
+                # Si busca las últimas N operaciones
+                match = re.search(r'últimas\s+(\d+)', user_input.lower())
+                
+                if match:
+                    n = match.group(1)  # Obtener el número del regex match
+                    # Construir una consulta directa para evitar errores
+                    sql = f"""
+                    SELECT o.id, u.nombre as usuario, o.operando1, o.operador, o.operando2, o.resultado, o.creado_en
+                    FROM operaciones o
+                    JOIN usuarios u ON o.usuario_id = u.id
+                    ORDER BY o.creado_en DESC
+                    LIMIT {n}
+                    """
+            
+            return sql
+        except Exception as e:
+            print(f"Error generando SQL: {e}")
+            # Consulta fallback en caso de error
+            return "SELECT id, operando1, operador, operando2, resultado FROM operaciones ORDER BY creado_en DESC LIMIT 5"

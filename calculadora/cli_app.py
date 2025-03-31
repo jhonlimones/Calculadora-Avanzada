@@ -6,6 +6,8 @@ import schedule
 import threading
 import os  # Para variables de entorno
 
+from calculadora.core.export_utils import export_to_csv, export_to_excel, export_to_binary
+from calculadora.core.serialization_utils import backup_user_data
 from calculadora.core.utils import limpiar_pantalla, leer_flotante, format_numero
 from calculadora.services.user_service import (
     validar_contrasena,
@@ -361,7 +363,7 @@ def opcion_ver_historial():
 
 def opcion_exportar():
     """
-    Permite exportar las operaciones a CSV o Excel (DB) según el tipo de usuario.
+    Permite exportar las operaciones a CSV, Excel o formato pickle (PKL) según el tipo de usuario.
     """
     limpiar_pantalla()
     
@@ -391,11 +393,24 @@ def opcion_exportar():
     print("¿En qué formato desea exportar?")
     print("1. CSV")
     print("2. Excel")
+    print("3. Pickle (formato binario para respaldo)")
     eleccion = input("Seleccione una opción: ")
+    
     if eleccion == '1':
-        export_to_csv(data, 'operaciones.csv')
+        nombre_archivo = input("Ingrese nombre del archivo (o Enter para 'operaciones.csv'): ") or "operaciones.csv"
+        if not nombre_archivo.endswith('.csv'):
+            nombre_archivo += '.csv'
+        export_to_csv(data, nombre_archivo)
     elif eleccion == '2':
-        export_to_excel(data, 'operaciones.xlsx')
+        nombre_archivo = input("Ingrese nombre del archivo (o Enter para 'operaciones.xlsx'): ") or "operaciones.xlsx"
+        if not nombre_archivo.endswith('.xlsx'):
+            nombre_archivo += '.xlsx'
+        export_to_excel(data, nombre_archivo)
+    elif eleccion == '3':
+        nombre_archivo = input("Ingrese nombre del archivo (o Enter para 'operaciones.pkl'): ") or "operaciones.pkl"
+        if not nombre_archivo.endswith('.pkl'):
+            nombre_archivo += '.pkl'
+        export_to_binary(data, nombre_archivo)
     else:
         print("Opción no válida.")
 
@@ -667,6 +682,65 @@ def opcion_chatbot_sql():
     conn.close()
     input("\nPresione Enter para continuar...")
 
+def opcion_backup():
+    """
+    Permite al superusuario crear copias de seguridad de los datos.
+    """
+    limpiar_pantalla()
+    if not is_superuser:
+        print("Esta función es exclusiva para superusuarios.")
+        input("\nPresione Enter para continuar...")
+        return
+    
+    print("=== Backup de Datos ===")
+    print("1. Backup de mi historial")
+    print("2. Backup de todos los usuarios")
+    print("3. Volver al Menú Principal")
+    
+    opcion = input("Seleccione una opción: ")
+    
+    if opcion == '1':
+        # Obtener datos del usuario actual
+        operaciones = obtener_operaciones(usuario_id=current_user_id)
+        historial = obtener_historial(usuario_id=current_user_id)
+        
+        datos = {
+            "operaciones": operaciones,
+            "historial": historial,
+            "fecha_backup": datetime.datetime.now()
+        }
+        
+        filename = backup_user_data(current_user_id, datos)
+        if filename:
+            print(f"Backup creado exitosamente: {filename}")
+        else:
+            print("Error al crear el backup.")
+            
+    elif opcion == '2':
+        # Obtener datos de todos los usuarios
+        operaciones = obtener_todas_las_operaciones_unidas()
+        usuarios = obtener_todos_usuarios()
+        historial = obtener_historial()
+        
+        datos = {
+            "operaciones": operaciones,
+            "usuarios": usuarios,
+            "historial": historial,
+            "fecha_backup": datetime.datetime.now()
+        }
+        
+        filename = backup_user_data("all", datos, "backups_admin")
+        if filename:
+            print(f"Backup global creado exitosamente: {filename}")
+        else:
+            print("Error al crear el backup global.")
+    elif opcion == '3':
+        return  # Volver al menú principal
+    else:
+        print("Opción no válida.")
+    
+    input("\nPresione Enter para continuar...")
+
 def main_menu():
     """
     Punto de entrada para manejar el menú principal.
@@ -686,7 +760,8 @@ def main_menu():
         if is_superuser:
             print("5. Crear Usuario")
             print("6. Chatbot SQL")  # Disponible solo para superusuario
-            print("7. Salir o Cambiar Sesión")
+            print("7. Backup de Datos")  # Nueva opción
+            print("8. Salir o Cambiar Sesión")  # Corregido de 7 a 8
         else:
             # Usuarios normales no ven la opción de chatbot
             print("5. Salir o Cambiar Sesión")
@@ -705,7 +780,9 @@ def main_menu():
             opcion_crear_usuario()
         elif opcion == '6' and is_superuser:
             opcion_chatbot_sql()
-        elif (opcion == '7' and is_superuser) or (opcion == '5' and not is_superuser):
+        elif opcion == '7' and is_superuser:  # Opción para Backup de Datos
+            opcion_backup()
+        elif (opcion == '8' and is_superuser) or (opcion == '5' and not is_superuser):  # Corregido de 7 a 8
             print("\n1. Salir de la aplicación")
             print("2. Cambiar de sesión")
             sub_opcion = input("Seleccione una opción: ")

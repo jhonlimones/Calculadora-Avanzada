@@ -1,6 +1,24 @@
 # calculadora/core/export_utils.py
 
 import pandas as pd
+import pickle
+from calculadora.core.serialization_utils import serialize_data
+
+def export_to_binary(data, filename='export.pkl'):
+    """
+    Exporta una lista de diccionarios a un archivo pickle serializado.
+    Útil para exportar grandes volúmenes de datos para respaldo.
+    """
+    if not data:
+        print("No hay datos para exportar.")
+        return False
+
+    if serialize_data(data, filename):
+        print(f"Datos exportados correctamente a {filename}")
+        return True
+    else:
+        print("Error al exportar datos.")
+        return False
 
 def export_to_csv(data, filename='export.csv'):
     """
