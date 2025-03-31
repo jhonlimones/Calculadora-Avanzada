@@ -140,9 +140,9 @@ flowchart TD
 5. **Funciones de Superusuario**: Los superusuarios tienen acceso a funcionalidades adicionales como la creación de usuarios y el chatbot SQL.
 6. **Chatbot SQL**: Permite realizar consultas en lenguaje natural que se convierten en SQL y muestran resultados formateados.
 
-## Arquitectura MCP del Chatbot SQL
+## Arquitectura MPC del Chatbot SQL
 
-El chatbot SQL implementa una arquitectura Modelo-Controlador-Presentador (MCP):
+El chatbot SQL implementa una arquitectura "Computación Multi-Parte" (MPC):
 
 - **Modelo**: Representado por las operaciones de base de datos en `db/models.py`
 - **Controlador**: Lógica principal en `sql_chatbot.py` que procesa las consultas en lenguaje natural
